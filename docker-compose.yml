@@ -1,0 +1,169 @@
+name: e-commerce-dev
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+      args:
+        NPM_TOKEN: ${NPM_TOKEN:-}
+    ports:
+      - "${FRONTEND_PORT:-8080}:8080"
+    environment:
+      NODE_ENV: development
+      PORT: 8080
+      VITE_AUTH_SERVICE_URL: http://auth-service:3001
+      VITE_PRODUCT_SERVICE_URL: http://product-service:3000
+      VITE_ORDER_SERVICE_URL: http://order-service:3002
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
+
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    ports:
+      - "${AUTH_PORT:-3001}:3001"
+    environment:
+      PORT: 3001
+      NODE_ENV: development
+      MONGODB_URI: mongodb://auth-mongodb:27017/auth
+      JWT_SECRET: ${JWT_SECRET:-efrei_super_pass}
+    volumes:
+      - ./services/auth-service:/app
+      - auth_node_modules:/app/node_modules
+    depends_on:
+      auth-mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/api/health').then(res => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - ecommerce-network
+
+  product-service:
+    build:
+      context: ./services/product-service
+      dockerfile: Dockerfile
+    ports:
+      - "${PRODUCT_PORT:-3000}:3000"
+    environment:
+      PORT: 3000
+      NODE_ENV: development
+      MONGODB_URI: mongodb://product-mongodb:27017/ecommerce
+      JWT_SECRET: ${JWT_SECRET:-efrei_super_pass}
+    volumes:
+      - ./services/product-service:/app
+      - product_node_modules:/app/node_modules
+    depends_on:
+      product-mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(res => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - ecommerce-network
+
+  order-service:
+    build:
+      context: ./services/order-service
+      dockerfile: Dockerfile
+    ports:
+      - "${ORDER_PORT:-3002}:3002"
+    environment:
+      PORT: 3002
+      NODE_ENV: development
+      MONGODB_URI: mongodb://order-mongodb:27017/orders
+      JWT_SECRET: ${JWT_SECRET:-efrei_super_pass}
+      VITE_PRODUCT_SERVICE_URL: http://product-service:3000
+    volumes:
+      - ./services/order-service:/app
+      - order_node_modules:/app/node_modules
+    depends_on:
+      order-mongodb:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002/api/health').then(res => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - ecommerce-network
+
+  auth-mongodb:
+    image: mongo:4.4
+    ports:
+      - "${AUTH_MONGO_PORT:-27017}:27017"
+    volumes:
+      - auth_mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongo", "--quiet", "--eval", "quit(db.adminCommand({ ping: 1 }).ok ? 0 : 2)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - ecommerce-network
+
+  product-mongodb:
+    image: mongo:4.4
+    ports:
+      - "${PRODUCT_MONGO_PORT:-27018}:27017"
+    volumes:
+      - product_mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongo", "--quiet", "--eval", "quit(db.adminCommand({ ping: 1 }).ok ? 0 : 2)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - ecommerce-network
+
+  order-mongodb:
+    image: mongo:4.4
+    ports:
+      - "${ORDER_MONGO_PORT:-27019}:27017"
+    volumes:
+      - order_mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongo", "--quiet", "--eval", "quit(db.adminCommand({ ping: 1 }).ok ? 0 : 2)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - ecommerce-network
+
+networks:
+  ecommerce-network:
+    driver: bridge
+
+volumes:
+  frontend_node_modules:
+  auth_node_modules:
+  product_node_modules:
+  order_node_modules:
+  auth_mongodb_data:
+  product_mongodb_data:
+  order_mongodb_data:
