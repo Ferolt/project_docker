@@ -10,12 +10,15 @@ ENV PORT=8080
 COPY package*.json ./
 COPY .npmrc ./
 
+RUN mkdir -p /app/node_modules \
+    && chown -R node:node /app
+
+USER node
+
 RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi \
     && npm cache clean --force
 
 COPY --chown=node:node . .
-
-USER node
 
 EXPOSE 8080
 
