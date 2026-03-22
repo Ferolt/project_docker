@@ -1,0 +1,22 @@
+FROM node:20-bookworm-slim
+
+WORKDIR /app
+
+ARG NPM_TOKEN=""
+ENV NPM_TOKEN=${NPM_TOKEN}
+ENV NODE_ENV=development
+ENV PORT=8080
+
+COPY package*.json ./
+COPY .npmrc ./
+
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi \
+    && npm cache clean --force
+
+COPY --chown=node:node . .
+
+USER node
+
+EXPOSE 8080
+
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "8080"]
