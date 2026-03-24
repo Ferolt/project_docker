@@ -2,24 +2,24 @@ FROM node:20-bookworm-slim
 
 WORKDIR /app
 
-ARG NPM_TOKEN=""
-ENV NPM_TOKEN=${NPM_TOKEN}
 ENV NODE_ENV=development
 ENV PORT=8080
 
-COPY package*.json ./
-COPY .npmrc ./
+RUN chown node:node /app
 
-RUN mkdir -p /app/node_modules \
-    && chown -R node:node /app
+COPY --chown=node:node package*.json ./
 
 USER node
 
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi \
+RUN mkdir -p /app/node_modules \
+    && if [ -f package-lock.json ]; then npm ci; else npm install; fi \
     && npm cache clean --force
 
 COPY --chown=node:node . .
 
 EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD node -e "require('http').get('http://127.0.0.1:' + (process.env.PORT || 8080) + '/', (r) => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))"
 
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "8080"]

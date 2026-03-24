@@ -36,7 +36,7 @@ run_backend_tests() {
     npm install --silent
     
     echo "🧪 Running tests..."
-    if NODE_ENV=test NODE_OPTIONS='--experimental-vm-modules' npm test; then
+    if npm test; then
         echo -e "${GREEN}✅ ${service_name} tests passed${NC}"
         cd - > /dev/null || return 1
         return 0
